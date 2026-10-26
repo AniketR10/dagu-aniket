@@ -11,6 +11,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -75,7 +76,10 @@ type scriptedProvider struct {
 
 func (p *scriptedProvider) Chat(_ context.Context, req *llmpkg.ChatRequest) (*llmpkg.ChatResponse, error) {
 	p.mu.Lock()
-	p.requests = append(p.requests, req)
+	// Record what this call carried: a retry appends to req.Messages.
+	sent := *req
+	sent.Messages = slices.Clone(req.Messages)
+	p.requests = append(p.requests, &sent)
 	var text, badArgs string
 	prose, bad := len(p.prose) > 0, false
 	if prose {
@@ -566,6 +570,7 @@ func TestExtractCorrectsAnUnusableAnswer(t *testing.T) {
 
 		assert.Equal(t, "Q-2026-001", run.exec.GetOutputs()["quote_no"])
 		require.Equal(t, 2, r.provider.count(), "the same model was asked once more")
+		assert.Len(t, r.provider.requests[0].Messages, 2, "the first call carried no correction")
 		retry := r.provider.requests[1].Messages
 		require.Len(t, retry, 4)
 		assert.Equal(t, llmpkg.RoleAssistant, retry[2].Role)
@@ -590,6 +595,7 @@ func TestExtractCorrectsAnUnusableAnswer(t *testing.T) {
 
 		assert.Equal(t, "Q-2026-001", run.exec.GetOutputs()["quote_no"])
 		require.Equal(t, 2, r.provider.count(), "the same model was asked once more")
+		assert.Len(t, r.provider.requests[0].Messages, 2, "the first call carried no correction")
 		retry := r.provider.requests[1].Messages
 		require.Len(t, retry, 4)
 		assert.Equal(t, llmpkg.RoleAssistant, retry[2].Role)

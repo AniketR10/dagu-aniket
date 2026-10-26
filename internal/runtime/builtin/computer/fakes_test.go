@@ -732,7 +732,10 @@ func (m *visionModel) Chat(_ context.Context, req *llmpkg.ChatRequest) (*llmpkg.
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.requests = append(m.requests, req)
+	// Record what this call carried: a retry appends to req.Messages.
+	sent := *req
+	sent.Messages = slices.Clone(req.Messages)
+	m.requests = append(m.requests, &sent)
 	if len(m.prose) > 0 {
 		text := m.prose[0]
 		m.prose = m.prose[1:]

@@ -167,6 +167,7 @@ func TestQueryCorrectsAnUnusableAnswer(t *testing.T) {
 
 		assert.Equal(t, map[string]any{"total": 42.5}, execution.exec.GetOutputs())
 		require.Len(t, run.vision.requests, 2, "the same model was asked once more")
+		assert.Len(t, run.vision.requests[0].Messages, 2, "the first call carried no correction")
 		retry := run.vision.requests[1].Messages
 		require.Len(t, retry, 4)
 		assert.Equal(t, llmpkg.RoleAssistant, retry[2].Role)

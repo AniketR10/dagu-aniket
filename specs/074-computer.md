@@ -158,6 +158,15 @@ When several models are listed, an `act` moves to the next model only when a
 model fails before any action ran. `extract` and conditions try the models in
 order for every request.
 
+`extract` and conditions ask for a `respond` tool call whose parameters are
+the answer schema. A reply without a tool call is accepted when its text is
+valid JSON. Any other reply gets one correction: the next request to the same
+model carries the rejected reply as an assistant message, followed by a user
+message stating why it was rejected, and the step log shows the rejected reply
+after `warning: <provider>/<model> answer rejected: <reason>`. When the
+corrected reply is also unusable, that model has failed and the next listed
+model is tried. Tokens of every call count, the rejected reply's included.
+
 ### Act
 
 An `act` shows the model a screenshot scaled to what the model accepts and
