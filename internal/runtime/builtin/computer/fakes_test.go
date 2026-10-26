@@ -718,6 +718,9 @@ type visionModel struct {
 	extract  string
 	truths   map[string]bool
 	requests []*llmpkg.ChatRequest
+	// prose answers the first requests in plain text, one entry each,
+	// without the respond call.
+	prose []string
 	// onChat runs at the start of every request, as the screen may change
 	// while the model answers.
 	onChat func()
@@ -730,6 +733,11 @@ func (m *visionModel) Chat(_ context.Context, req *llmpkg.ChatRequest) (*llmpkg.
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.requests = append(m.requests, req)
+	if len(m.prose) > 0 {
+		text := m.prose[0]
+		m.prose = m.prose[1:]
+		return &llmpkg.ChatResponse{Content: text, Usage: llmpkg.Usage{PromptTokens: 5, CompletionTokens: 1}}, nil
+	}
 	arguments := m.extract
 	properties, _ := req.Tools[0].Function.Parameters["properties"].(map[string]any)
 	if _, judge := properties["answer"]; judge {

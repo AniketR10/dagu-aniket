@@ -147,6 +147,61 @@ func TestExtractPublishesOutputs(t *testing.T) {
 	assert.Len(t, run.vision.requests[0].Messages[1].Images, 1, "the model reads a screenshot")
 }
 
+// A model whose answer has no respond call is shown that answer and asked
+// once more before the next model is tried. The rejected answer reaches the
+// step log masked, and every call's tokens count.
+func TestQueryCorrectsAnUnusableAnswer(t *testing.T) {
+	t.Parallel()
+
+	const step = `{"do": [{"extract": {"instruction": "The invoice total", "schema": {"type": "object", "properties": {"total": {"type": "number"}}}}}]}`
+
+	t.Run("Corrected", func(t *testing.T) {
+		t.Parallel()
+
+		run := newTestRun(t)
+		run.secrets = map[string]string{"SHOP_TOKEN": "hunter2-secret"}
+		run.vision.extract = `{"total": 42.5}`
+		run.vision.prose = []string{"The total is 42.5, token hunter2-secret."}
+		execution := run.execute(step, nil)
+		require.NoError(t, execution.err)
+
+		assert.Equal(t, map[string]any{"total": 42.5}, execution.exec.GetOutputs())
+		require.Len(t, run.vision.requests, 2, "the same model was asked once more")
+		retry := run.vision.requests[1].Messages
+		require.Len(t, retry, 4)
+		assert.Equal(t, llmpkg.RoleAssistant, retry[2].Role)
+		assert.NotContains(t, retry[2].Content, "hunter2-secret")
+		assert.Equal(t, llmpkg.RoleUser, retry[3].Role)
+		assert.Contains(t, retry[3].Content, "model did not return structured output")
+		log := execution.stderr.String()
+		assert.Contains(t, log, "warning: openai/test-model answer rejected: model did not return structured output")
+		assert.Contains(t, log, "The total is 42.5")
+		assert.NotContains(t, log, "hunter2-secret")
+		assert.Equal(t, int64(12), execution.exec.GetAgentSession().Usage.TotalTokens, "both calls count")
+	})
+
+	t.Run("FallsBackAfterOneCorrection", func(t *testing.T) {
+		t.Parallel()
+
+		run := newTestRun(t)
+		run.llm = &ir.LLMConfig{Models: []ir.ModelEntry{
+			{Provider: "openai", Name: "first"},
+			{Provider: "openai", Name: "second"},
+		}}
+		run.vision.extract = `{"total": 42.5}`
+		run.vision.prose = []string{"Prose.", "Prose again."}
+		execution := run.execute(step, nil)
+		require.NoError(t, execution.err)
+
+		assert.Equal(t, map[string]any{"total": 42.5}, execution.exec.GetOutputs())
+		require.Len(t, run.vision.requests, 3)
+		assert.Equal(t, "first", run.vision.requests[1].Model)
+		assert.Equal(t, "second", run.vision.requests[2].Model)
+		assert.Len(t, run.vision.requests[2].Messages, 2, "the next model starts without the correction")
+		assert.Equal(t, int64(18), execution.exec.GetAgentSession().Usage.TotalTokens)
+	})
+}
+
 // extractStep reads the invoice amount into a number output.
 const extractStep = `{"do": [{"extract": {"instruction": "The invoice amount", "schema": {"type": "object", "properties": {"amount": {"type": "number"}}}}}]}`
 
