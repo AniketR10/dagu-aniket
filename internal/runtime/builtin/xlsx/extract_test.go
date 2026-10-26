@@ -68,22 +68,34 @@ type scriptedProvider struct {
 	// prose answers the first requests in plain text, one entry each,
 	// without the respond call.
 	prose []string
+	// badArgs answers the next requests with a respond call whose
+	// arguments are each entry, which need not be valid JSON.
+	badArgs []string
 }
 
 func (p *scriptedProvider) Chat(_ context.Context, req *llmpkg.ChatRequest) (*llmpkg.ChatResponse, error) {
 	p.mu.Lock()
 	p.requests = append(p.requests, req)
-	var text string
-	prose := len(p.prose) > 0
+	var text, badArgs string
+	prose, bad := len(p.prose) > 0, false
 	if prose {
 		text, p.prose = p.prose[0], p.prose[1:]
+	} else if len(p.badArgs) > 0 {
+		badArgs, p.badArgs, bad = p.badArgs[0], p.badArgs[1:], true
 	}
 	p.mu.Unlock()
 	if p.fail != nil {
 		return nil, p.fail
 	}
+	usage := llmpkg.Usage{PromptTokens: 10, CompletionTokens: 2}
 	if prose {
-		return &llmpkg.ChatResponse{Content: text, Usage: llmpkg.Usage{PromptTokens: 10, CompletionTokens: 2}}, nil
+		return &llmpkg.ChatResponse{Content: text, Usage: usage}, nil
+	}
+	if bad {
+		return &llmpkg.ChatResponse{
+			ToolCalls: []llmpkg.ToolCall{{ID: "call_1", Type: "function", Function: llmpkg.ToolCallFunction{Name: "respond", Arguments: badArgs}}},
+			Usage:     usage,
+		}, nil
 	}
 	args, err := json.Marshal(p.answer(req))
 	if err != nil {
@@ -564,6 +576,27 @@ func TestExtractCorrectsAnUnusableAnswer(t *testing.T) {
 		assert.Contains(t, log, "warning: openai/test-model answer rejected: model did not return structured output")
 		assert.Contains(t, log, "The quote number is in B3.")
 		assert.NotContains(t, log, "tok-12345")
+		assert.Equal(t, "Extracted 3 fields from quote.xlsx Sheet1 (model, 24 tokens)\n", run.stdout.String(), "both calls count")
+	})
+
+	t.Run("InvalidArguments", func(t *testing.T) {
+		t.Parallel()
+		r := newExtractRun(t)
+		r.secrets = map[string]string{"SHOP_TOKEN": "tok-12345"}
+		quoteBook(t, r.dir, nil)
+		r.provider.badArgs = []string{`{"quote_no": "B3", "note": "tok-12345"`}
+		run := r.execute(quoteConfig(nil), testModel)
+		require.NoError(t, run.err)
+
+		assert.Equal(t, "Q-2026-001", run.exec.GetOutputs()["quote_no"])
+		require.Equal(t, 2, r.provider.count(), "the same model was asked once more")
+		retry := r.provider.requests[1].Messages
+		require.Len(t, retry, 4)
+		assert.Equal(t, llmpkg.RoleAssistant, retry[2].Role)
+		assert.Contains(t, retry[2].Content, `"quote_no": "B3"`, "the model sees its own arguments")
+		assert.NotContains(t, retry[2].Content, "tok-12345")
+		assert.Contains(t, retry[3].Content, "model did not return structured output")
+		assert.NotContains(t, run.stderr.String(), "tok-12345")
 		assert.Equal(t, "Extracted 3 fields from quote.xlsx Sheet1 (model, 24 tokens)\n", run.stdout.String(), "both calls count")
 	})
 
