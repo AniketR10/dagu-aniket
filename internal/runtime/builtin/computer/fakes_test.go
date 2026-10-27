@@ -721,6 +721,9 @@ type visionModel struct {
 	// prose answers the first requests in plain text, one entry each,
 	// without the respond call.
 	prose []string
+	// badArgs answers the next requests with a respond call whose
+	// arguments are each entry, which need not be valid JSON.
+	badArgs []string
 	// onChat runs at the start of every request, as the screen may change
 	// while the model answers.
 	onChat func()
@@ -740,6 +743,14 @@ func (m *visionModel) Chat(_ context.Context, req *llmpkg.ChatRequest) (*llmpkg.
 		text := m.prose[0]
 		m.prose = m.prose[1:]
 		return &llmpkg.ChatResponse{Content: text, Usage: llmpkg.Usage{PromptTokens: 5, CompletionTokens: 1}}, nil
+	}
+	if len(m.badArgs) > 0 {
+		args := m.badArgs[0]
+		m.badArgs = m.badArgs[1:]
+		return &llmpkg.ChatResponse{
+			ToolCalls: []llmpkg.ToolCall{{ID: "r", Type: "function", Function: llmpkg.ToolCallFunction{Name: agentstep.RespondToolName, Arguments: args}}},
+			Usage:     llmpkg.Usage{PromptTokens: 5, CompletionTokens: 1},
+		}, nil
 	}
 	arguments := m.extract
 	properties, _ := req.Tools[0].Function.Parameters["properties"].(map[string]any)

@@ -133,20 +133,19 @@ func Correction(reason error) string {
 }
 
 // RejectedAnswer returns what the model answered: the respond call's
-// arguments, otherwise its text. A blank answer becomes a placeholder,
-// since providers reject an empty assistant message.
+// arguments, otherwise its text, whichever is first not blank. A blank
+// answer becomes a placeholder, since providers reject an empty assistant
+// message.
 func RejectedAnswer(resp *llmpkg.ChatResponse) string {
-	answer := resp.Content
 	for _, call := range resp.ToolCalls {
-		if call.Function.Name == RespondToolName {
-			answer = call.Function.Arguments
-			break
+		if call.Function.Name == RespondToolName && strings.TrimSpace(call.Function.Arguments) != "" {
+			return call.Function.Arguments
 		}
 	}
-	if strings.TrimSpace(answer) == "" {
-		return emptyAnswer
+	if strings.TrimSpace(resp.Content) != "" {
+		return resp.Content
 	}
-	return answer
+	return emptyAnswer
 }
 
 // lockHeartbeatInterval keeps a held lock well inside dirlock's staleness

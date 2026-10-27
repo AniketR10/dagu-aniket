@@ -182,6 +182,30 @@ func TestQueryCorrectsAnUnusableAnswer(t *testing.T) {
 		assert.Equal(t, int64(12), execution.exec.GetAgentSession().Usage.TotalTokens, "both calls count")
 	})
 
+	t.Run("InvalidArguments", func(t *testing.T) {
+		t.Parallel()
+
+		run := newTestRun(t)
+		run.secrets = map[string]string{"SHOP_TOKEN": "hunter2-secret"}
+		run.vision.extract = `{"total": 42.5}`
+		// Arguments cut off at max_tokens, the usual shape under a forced
+		// tool choice.
+		run.vision.badArgs = []string{`{"total": 42.5, "note": "hunter2-secret`}
+		execution := run.execute(step, nil)
+		require.NoError(t, execution.err)
+
+		assert.Equal(t, map[string]any{"total": 42.5}, execution.exec.GetOutputs())
+		require.Len(t, run.vision.requests, 2, "the same model was asked once more")
+		retry := run.vision.requests[1].Messages
+		require.Len(t, retry, 4)
+		assert.Equal(t, llmpkg.RoleAssistant, retry[2].Role)
+		assert.Contains(t, retry[2].Content, `"total": 42.5`, "the model sees its own arguments")
+		assert.NotContains(t, retry[2].Content, "hunter2-secret")
+		assert.Contains(t, retry[3].Content, "model did not return structured output")
+		assert.NotContains(t, execution.stderr.String(), "hunter2-secret")
+		assert.Equal(t, int64(12), execution.exec.GetAgentSession().Usage.TotalTokens, "both calls count")
+	})
+
 	t.Run("FallsBackAfterOneCorrection", func(t *testing.T) {
 		t.Parallel()
 

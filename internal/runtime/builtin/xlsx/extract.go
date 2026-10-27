@@ -403,7 +403,7 @@ func (e *extractExecutor) query(ctx context.Context, layout *workbook.SheetLayou
 					Parameters:  e.parameters,
 				},
 			}},
-			ToolChoice: "required",
+			ToolChoice: agentstep.ToolChoiceRequired,
 		})
 		if err != nil {
 			if ctx.Err() != nil {

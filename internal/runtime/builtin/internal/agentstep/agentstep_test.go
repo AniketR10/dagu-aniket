@@ -45,6 +45,11 @@ func TestRejectedAnswer(t *testing.T) {
 	assert.Equal(t, "plain text", agentstep.RejectedAnswer(&llmpkg.ChatResponse{Content: "plain text"}))
 	assert.Equal(t, "(no answer)", agentstep.RejectedAnswer(&llmpkg.ChatResponse{Content: " "}))
 	assert.Equal(t, "(no answer)", agentstep.RejectedAnswer(&llmpkg.ChatResponse{}))
+
+	// Text beside a blank respond call is what the model actually said.
+	blankCall := respond("")
+	blankCall.Content = "I could not find the total."
+	assert.Equal(t, "I could not find the total.", agentstep.RejectedAnswer(blankCall))
 }
 
 func TestToolParametersStripsAnnotations(t *testing.T) {
