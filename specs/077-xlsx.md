@@ -699,9 +699,10 @@ found "n/a"`; Japanese text such as `￥123,000`, `12万3,500円`, `令和8年10
 The step takes the DAG-level `llm` block, or `with.llm`, which replaces it,
 as browser steps do. Several models are tried in order, each set up when
 its turn comes, and an unusable answer, after its correction when it gets
-one, or a model that cannot be set up counts as a failed request. The outputs are
-each property, `cells` (property to the `Sheet1!B7` it was read from,
-empty when absent), `sheet`, `warnings`, and `source`, `model` or `cache`.
+one, or a model that cannot be set up counts as a failed request. The
+outputs are each property, `cells` (property to the `Sheet1!B7` it was
+read from, empty when absent), `sheet`, `warnings`, and `source`, `model`
+or `cache`.
 The stdout line is `Extracted 4 fields from quote.xlsx Sheet1 (model, 1234
 tokens)` or `Extracted 4 fields from quote.xlsx Sheet1 (cache)`; the token
 count covers every model call, a rejected reply's included.

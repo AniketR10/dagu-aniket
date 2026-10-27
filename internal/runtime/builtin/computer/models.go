@@ -120,6 +120,7 @@ func (r *run) query(ctx context.Context, instruction string, schema map[string]a
 					Parameters:  parameters,
 				},
 			}},
+			ToolChoice: agentstep.ToolChoiceRequired,
 		})
 		if err != nil {
 			if ctx.Err() != nil {

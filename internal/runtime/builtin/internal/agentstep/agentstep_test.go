@@ -29,6 +29,24 @@ func TestStructuredAnswer(t *testing.T) {
 	assert.Error(t, err)
 }
 
+// A blank answer is replaced, since providers reject an empty assistant
+// message.
+func TestRejectedAnswer(t *testing.T) {
+	t.Parallel()
+
+	respond := func(arguments string) *llmpkg.ChatResponse {
+		return &llmpkg.ChatResponse{ToolCalls: []llmpkg.ToolCall{{
+			Function: llmpkg.ToolCallFunction{Name: agentstep.RespondToolName, Arguments: arguments},
+		}}}
+	}
+	assert.Equal(t, `{"ok":`, agentstep.RejectedAnswer(respond(`{"ok":`)))
+	assert.Equal(t, "(no answer)", agentstep.RejectedAnswer(respond("")))
+	assert.Equal(t, "(no answer)", agentstep.RejectedAnswer(respond("  \n")))
+	assert.Equal(t, "plain text", agentstep.RejectedAnswer(&llmpkg.ChatResponse{Content: "plain text"}))
+	assert.Equal(t, "(no answer)", agentstep.RejectedAnswer(&llmpkg.ChatResponse{Content: " "}))
+	assert.Equal(t, "(no answer)", agentstep.RejectedAnswer(&llmpkg.ChatResponse{}))
+}
+
 func TestToolParametersStripsAnnotations(t *testing.T) {
 	t.Parallel()
 

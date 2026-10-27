@@ -145,6 +145,7 @@ func TestExtractPublishesOutputs(t *testing.T) {
 	assert.JSONEq(t, `{"total": 42.5}`, execution.stdout.String())
 	require.Len(t, run.vision.requests, 1)
 	assert.Len(t, run.vision.requests[0].Messages[1].Images, 1, "the model reads a screenshot")
+	assert.Equal(t, agentstep.ToolChoiceRequired, run.vision.requests[0].ToolChoice, "the model must call respond")
 }
 
 // A model whose answer has no respond call is shown that answer and asked
