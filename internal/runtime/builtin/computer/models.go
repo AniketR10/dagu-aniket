@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"slices"
 
 	"github.com/dagucloud/dagu/v2/internal/ir"
 	llmpkg "github.com/dagucloud/dagu/v2/internal/llm"
@@ -155,10 +154,7 @@ func (r *run) ask(ctx context.Context, m model, req *llmpkg.ChatRequest) (json.R
 			return nil, err
 		}
 		corrected = true
-		req.Messages = append(slices.Clip(req.Messages),
-			llmpkg.Message{Role: llmpkg.RoleAssistant, Content: rejected},
-			llmpkg.Message{Role: llmpkg.RoleUser, Content: agentstep.Correction(err)},
-		)
+		agentstep.AppendCorrection(req, rejected, err)
 	}
 }
 

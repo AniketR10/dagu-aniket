@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"maps"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -130,6 +131,16 @@ const (
 // an answer that could not be used for reason.
 func Correction(reason error) string {
 	return fmt.Sprintf(correctionFormat, reason)
+}
+
+// AppendCorrection adds the rejected answer and a correction for reason to
+// req, as plain messages. The messages go on req's own copy, so a slice
+// that other requests share is never written.
+func AppendCorrection(req *llmpkg.ChatRequest, rejected string, reason error) {
+	req.Messages = append(slices.Clip(req.Messages),
+		llmpkg.Message{Role: llmpkg.RoleAssistant, Content: rejected},
+		llmpkg.Message{Role: llmpkg.RoleUser, Content: Correction(reason)},
+	)
 }
 
 // RejectedAnswer returns what the model answered: the respond call's

@@ -4,6 +4,7 @@
 package agentstep_test
 
 import (
+	"errors"
 	"testing"
 
 	llmpkg "github.com/dagucloud/dagu/v2/internal/llm"
@@ -50,6 +51,21 @@ func TestRejectedAnswer(t *testing.T) {
 	blankCall := respond("")
 	blankCall.Content = "I could not find the total."
 	assert.Equal(t, "I could not find the total.", agentstep.RejectedAnswer(blankCall))
+}
+
+// The correction goes on the request's own copy of the messages, so a
+// slice shared with the next model's request is never written.
+func TestAppendCorrection(t *testing.T) {
+	t.Parallel()
+
+	shared := make([]llmpkg.Message, 2, 4)
+	req := &llmpkg.ChatRequest{Messages: shared}
+	agentstep.AppendCorrection(req, `{"total":`, errors.New("bad answer"))
+
+	require.Len(t, req.Messages, 4)
+	assert.Equal(t, llmpkg.Message{Role: llmpkg.RoleAssistant, Content: `{"total":`}, req.Messages[2])
+	assert.Equal(t, llmpkg.Message{Role: llmpkg.RoleUser, Content: agentstep.Correction(errors.New("bad answer"))}, req.Messages[3])
+	assert.Empty(t, shared[:4][2].Role, "the shared slice is not written")
 }
 
 func TestToolParametersStripsAnnotations(t *testing.T) {

@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"slices"
 	"sync"
 
 	"github.com/dagucloud/dagu/v2/internal/cmn/masking"
@@ -200,10 +199,7 @@ func (b *modelBridge) ask(ctx context.Context, provider llmpkg.Provider, model i
 			return nil, usage, err
 		}
 		corrected = true
-		req.Messages = append(slices.Clip(req.Messages),
-			llmpkg.Message{Role: llmpkg.RoleAssistant, Content: rejected},
-			llmpkg.Message{Role: llmpkg.RoleUser, Content: agentstep.Correction(err)},
-		)
+		agentstep.AppendCorrection(req, rejected, err)
 	}
 }
 

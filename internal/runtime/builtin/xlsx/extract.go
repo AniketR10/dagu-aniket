@@ -14,7 +14,6 @@ import (
 	"maps"
 	"os"
 	"regexp"
-	"slices"
 	"strings"
 	"sync"
 
@@ -451,10 +450,7 @@ func (e *extractExecutor) ask(ctx context.Context, provider llmpkg.Provider, m m
 			return nil, err
 		}
 		corrected = true
-		req.Messages = append(slices.Clip(req.Messages),
-			llmpkg.Message{Role: llmpkg.RoleAssistant, Content: rejected},
-			llmpkg.Message{Role: llmpkg.RoleUser, Content: agentstep.Correction(err)},
-		)
+		agentstep.AppendCorrection(req, rejected, err)
 	}
 }
 
